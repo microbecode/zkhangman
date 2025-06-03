@@ -1,0 +1,262 @@
+.hangman-game {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  text-align: center;
+}
+
+.hangman-drawing {
+  position: relative;
+  width: 300px;
+  height: 400px;
+  margin: 0 auto 40px;
+}
+
+/* Hangman parts */
+.base {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 10px;
+  background: #333;
+  z-index: 1;
+}
+
+.pole {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 310px;
+  background: #333;
+  z-index: 1;
+}
+
+.beam {
+  position: absolute;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 210px;
+  height: 10px;
+  background: #333;
+  z-index: 1;
+}
+
+.rope {
+  position: absolute;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-100px);
+  width: 5px;
+  height: 60px;
+  background: #666;
+  z-index: 2;
+}
+
+.head {
+  position: absolute;
+  top: 100px;
+  left: 50%;
+  transform: translateX(-127px);
+  width: 50px;
+  height: 50px;
+  border: 5px solid #333;
+  border-radius: 50%;
+  z-index: 3;
+}
+
+.body {
+  position: absolute;
+  top: 150px;
+  left: 50%;
+  transform: translateX(-100px);
+  width: 5px;
+  height: 100px;
+  background: #333;
+  z-index: 3;
+}
+
+.left-arm {
+  position: absolute;
+  top: 170px;
+  left: 50%;
+  transform: translateX(-100px) rotate(-45deg);
+  width: 5px;
+  height: 60px;
+  background: #333;
+  transform-origin: top center;
+  z-index: 3;
+}
+
+.right-arm {
+  position: absolute;
+  top: 170px;
+  left: 50%;
+  transform: translateX(-100px) rotate(45deg);
+  width: 5px;
+  height: 60px;
+  background: #333;
+  transform-origin: top center;
+  z-index: 3;
+}
+
+.left-leg {
+  position: absolute;
+  top: 250px;
+  left: 50%;
+  transform: translateX(-100px) rotate(-30deg);
+  width: 5px;
+  height: 80px;
+  background: #333;
+  transform-origin: top center;
+  z-index: 3;
+}
+
+.right-leg {
+  position: absolute;
+  top: 250px;
+  left: 50%;
+  transform: translateX(-100px) rotate(30deg);
+  width: 5px;
+  height: 80px;
+  background: #333;
+  transform-origin: top center;
+  z-index: 3;
+}
+
+.word-display {
+  font-size: 2em;
+  letter-spacing: 0.2em;
+  margin: 20px 0;
+}
+
+.letter {
+  display: inline-block;
+  min-width: 30px;
+  margin: 0 5px;
+  border-bottom: 3px solid #333;
+  padding-bottom: 5px;
+}
+
+.keyboard {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding: 20px;
+  background: #f8f8f8;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.key {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #333;
+  border-radius: 5px;
+  background: white;
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.key:hover:not(:disabled) {
+  background: #e0e0e0;
+  transform: translateY(-2px);
+}
+
+.key:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f0f0f0;
+  color: #999;
+}
+
+.key.guessed {
+  background: #ddd;
+  color: #666;
+  border-color: #999;
+}
+
+.game-status {
+  margin: 20px 0;
+  padding: 20px;
+  border-radius: 10px;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.message {
+  font-size: 1.2em;
+  margin: 10px 0;
+  padding: 20px;
+  border-radius: 8px;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.message h2 {
+  margin: 0 0 15px 0;
+  font-size: 1.8em;
+}
+
+.message p {
+  margin: 10px 0;
+  font-size: 1.1em;
+}
+
+.message strong {
+  color: #2c3e50;
+  font-size: 1.2em;
+}
+
+.message.won {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 2px solid #a5d6a7;
+}
+
+.message.lost {
+  background: #ffebee;
+  color: #c62828;
+  border: 2px solid #ef9a9a;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reset-button {
+  padding: 12px 24px;
+  font-size: 1.2em;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 15px;
+  font-weight: bold;
+}
+
+.reset-button:hover {
+  background: #2980b9;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+} 
