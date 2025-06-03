@@ -1,11 +1,13 @@
 import { useState, useCallback } from 'react';
+import { Noir } from '@noir-lang/noir_js';
+import { UltraHonkBackend } from '@aztec/bb.js';
+import circuit from '../../../circuit/target/circuit.json';
 import './Hangman.css';
 
 // List of words to guess
 const WORDS = [
 
   'NOIR',
-
 ];
 
 // Maximum number of incorrect guesses before game over
@@ -16,13 +18,47 @@ export function Hangman() {
   const [word, setWord] = useState(() => WORDS[Math.floor(Math.random() * WORDS.length)]);
   const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
   const [gameStatus, setGameStatus] = useState<'playing' | 'won' | 'lost'>('playing');
+  const [proof, setProof] = useState<string>('');
+  const [isGeneratingProof, setIsGeneratingProof] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Calculate number of wrong guesses
   const wrongGuesses = guessedLetters.filter(letter => !word.includes(letter)).length;
 
-  // Check if game is over
-  const isGameOver = wrongGuesses >= MAX_WRONG_GUESSES;
-  const isWinner = word.split('').every(letter => guessedLetters.includes(letter));
+  // Generate proof that the word was correctly guessed
+  const generateProof = async (targetWord: string) => {
+    try {
+      setIsGeneratingProof(true);
+      setError(null);
+
+      const noir = new Noir(circuit);
+      const backend = new UltraHonkBackend(circuit.bytecode);
+
+      // Convert words to byte arrays
+      const targetWordBytes = new Array(10).fill(0);
+      const guessedWordBytes = new Array(10).fill(0);
+      
+      for (let i = 0; i < targetWord.length; i++) {
+        targetWordBytes[i] = targetWord.charCodeAt(i);
+        guessedWordBytes[i] = targetWord.charCodeAt(i); // Since we won, guessed word = target word
+      }
+
+      // Generate witness
+      const { witness } = await noir.execute({
+        target_word: targetWordBytes,
+        guessed_word: guessedWordBytes
+      });
+
+      // Generate proof
+      const proofResult = await backend.generateProof(witness);
+      setProof(proofResult.proof);
+    } catch (err) {
+      console.error('Error generating proof:', err);
+      setError(err instanceof Error ? err.message : 'Failed to generate proof');
+    } finally {
+      setIsGeneratingProof(false);
+    }
+  };
 
   // Handle letter guess
   const handleGuess = useCallback((letter: string) => {
@@ -38,6 +74,7 @@ export function Hangman() {
     // Check game status
     if (isNewWinner) {
       setGameStatus('won');
+      generateProof(word);
     } else if (isNewGameOver) {
       setGameStatus('lost');
     }
@@ -48,6 +85,8 @@ export function Hangman() {
     setWord(WORDS[Math.floor(Math.random() * WORDS.length)]);
     setGuessedLetters([]);
     setGameStatus('playing');
+    setProof('');
+    setError(null);
   };
 
   // Render the word with blanks and guessed letters
@@ -102,6 +141,17 @@ export function Hangman() {
           <div className="message won">
             <h2>🎉 Congratulations! 🎉</h2>
             <p>You saved the hangman! The word was: <strong>{word}</strong></p>
+            {isGeneratingProof ? (
+              <p>Generating proof... ⏳</p>
+            ) : error ? (
+              <p className="error">Error generating proof: {error}</p>
+            ) : proof ? (
+              <div className="proof-container">
+                <h3>🎯 Zero Knowledge Proof</h3>
+                <p>You've proven you know the word without revealing it!</p>
+                <div className="proof">{proof}</div>
+              </div>
+            ) : null}
             <p>Want to try another word?</p>
           </div>
         )}
