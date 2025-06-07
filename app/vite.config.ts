@@ -45,5 +45,8 @@ export default defineConfig({
       strict: false
     }
   },
-  root: 'src'
+  root: 'src',
+  json: {
+    stringify: true
+  }
 }); 

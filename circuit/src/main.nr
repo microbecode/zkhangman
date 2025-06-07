@@ -1,8 +1,8 @@
 fn main(
     // The target word (private)
-    target_word: [u32; 10],
+    target_word: [u32; 4],
     // The guessed word (public)
-    guessed_word: pub [u32; 10],
+    guessed_word: pub [u32; 4],
 )  {
     // Check that the guessed word matches the target word
     // Only check up to word_length characters
