@@ -2,11 +2,11 @@ import { useState, useCallback, useEffect } from "react";
 import { Noir } from "@noir-lang/noir_js";
 import { UltraHonkBackend } from "@aztec/bb.js";
 import circuit from "../../public/circuit.json";
-/* import vk from '../../public/vk';
-import vkey from '../../public/vkey.json'; */
+import vkey from "../../public/vkey.json";
 import "./Hangman.css";
 import { zkVerifySession, ZkVerifyEvents } from "zkverifyjs";
 import fs from "fs";
+import { verifyProof } from "../verify";
 
 // List of words to guess
 const WORDS = ["NOIR"];
@@ -29,45 +29,12 @@ export function Hangman() {
 
   useEffect(() => {
     const doit = async () => {
-      async () => {
-        const bufvk = fs.readFileSync("../../public/vk");
-        /* const bufproof = fs.readFileSync("../target/proof");
-const base64Proof = bufproof.toString("base64"); */
-        const base64Vk = bufvk.toString("base64");
-
-        const session = await zkVerifySession
-          .start()
-          .Volta()
-          .withAccount("seed-phrase");
-        //const vkey2 = fs.readFileSync(vkey);
-        const vkey = fs.readFileSync("../../public/vkey.json");
-
-        session.subscribe([
-          {
-            event: ZkVerifyEvents.NewAggregationReceipt,
-            callback: async (eventData: any) => {
-              console.log("New aggregation receipt:", eventData);
-              /*   let statementpath = await session.getAggregateStatementPath(
-            eventData.blockHash,
-            parseInt(eventData.data.domainId),
-            parseInt(eventData.data.aggregationId),
-            statement
-          );
-          console.log("Statement path:", statementpath);
-          const statementproof = {
-            ...statementpath,
-            domainId: parseInt(eventData.data.domainId),
-            aggregationId: parseInt(eventData.data.aggregationId),
-          };
-          // fs.writeFile("aggregation.json", JSON.stringify(statementproof));
-          console.log("aggregation", JSON.stringify(statementproof)); */
-            },
-            options: { domainId: 0 },
-          },
-        ]);
-      };
+      try {
+        console.log("VKey data:", vkey);
+      } catch (error) {
+        console.error("Error accessing vkey:", error);
+      }
     };
-
     doit();
   }, []);
 
@@ -107,14 +74,16 @@ const base64Proof = bufproof.toString("base64"); */
       const proofHex = Buffer.from(proofResult.proof).toString("hex");
       setProof(proofHex);
 
+      verifyProof(proofResult.proof);
+
       // Verify the proof
-      const isValid = await backend.verifyProof(
+      /* const isValid = await backend.verifyProof(
         proofResult.proof,
         vkey.verification_key
       );
       if (!isValid) {
         throw new Error("Proof verification failed");
-      }
+      } */
     } catch (err) {
       console.error("Error generating proof:", err);
       setError(err instanceof Error ? err.message : "Failed to generate proof");
