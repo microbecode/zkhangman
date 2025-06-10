@@ -180,6 +180,7 @@ const base64Proof = bufproof.toString("base64"); */
         <div className="beam" />
         {/* Rope */}
         <div className="rope" />
+        <div className="ropenoose" />
         {/* Head */}
         {wrongGuesses >= 1 && <div className="head" />}
         {/* Body */}

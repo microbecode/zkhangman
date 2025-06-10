@@ -52,26 +52,38 @@
   left: 50%;
   transform: translateX(-100px);
   width: 5px;
-  height: 60px;
+  height: 85px;
+  background: #666;
+  z-index: 2;
+}
+
+.ropenoose {
+  position: absolute;
+  top: 170px;
+  left: 48%;
+  transform: translateX(-100px);
+  width: 17px;
+  height: 5px;
   background: #666;
   z-index: 2;
 }
 
 .head {
   position: absolute;
-  top: 100px;
+  top: 105px;
   left: 50%;
   transform: translateX(-127px);
   width: 50px;
   height: 50px;
   border: 5px solid #333;
   border-radius: 50%;
+  background-color: white;
   z-index: 3;
 }
 
 .body {
   position: absolute;
-  top: 150px;
+  top: 160px;
   left: 50%;
   transform: translateX(-100px);
   width: 5px;
@@ -82,7 +94,7 @@
 
 .left-arm {
   position: absolute;
-  top: 170px;
+  top: 180px;
   left: 50%;
   transform: translateX(-100px) rotate(-45deg);
   width: 5px;
@@ -94,7 +106,7 @@
 
 .right-arm {
   position: absolute;
-  top: 170px;
+  top: 180px;
   left: 50%;
   transform: translateX(-100px) rotate(45deg);
   width: 5px;
@@ -106,7 +118,7 @@
 
 .left-leg {
   position: absolute;
-  top: 250px;
+  top: 260px;
   left: 50%;
   transform: translateX(-100px) rotate(-30deg);
   width: 5px;
@@ -118,7 +130,7 @@
 
 .right-leg {
   position: absolute;
-  top: 250px;
+  top: 260px;
   left: 50%;
   transform: translateX(-100px) rotate(30deg);
   width: 5px;
@@ -291,4 +303,4 @@
   padding: 10px;
   border-radius: 4px;
   margin: 10px 0;
-} 
+}
