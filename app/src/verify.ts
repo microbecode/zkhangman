@@ -1,6 +1,3 @@
-import { zkVerifySession, ZkVerifyEvents, WalletOptions } from "zkverifyjs";
-import fs from "fs";
-import vkey from "./vkey.json";
 import axios from "axios";
 import { ProofData } from "@aztec/bb.js";
 import { WORD_LENGTH } from "./components/Hangman";

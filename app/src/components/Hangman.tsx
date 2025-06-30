@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Noir } from "@noir-lang/noir_js";
 import { UltraPlonkBackend } from "@aztec/bb.js";
 import circuit from "../circuit.json";
