@@ -2,18 +2,14 @@ import { zkVerifySession, ZkVerifyEvents, WalletOptions } from "zkverifyjs";
 import fs from "fs";
 import vkey from "./vkey.json";
 import axios from "axios";
+import { ProofData } from "@aztec/bb.js";
+import { WORD_LENGTH } from "./components/Hangman";
 
-//const bufvk = fs.readFileSync("../vkey.json");
-/* const bufproof = fs.readFileSync("../circuit/target/proof");
-const base64Proof = bufproof.toString("base64");
-const base64Vk = bufvk.toString("base64"); */
-
-/* let wallet: WalletOptions = {
-  accountAddress: "0x0000000000000000000000000000000000000000",
-  source,
-}; */
-
-export const verifyProof = async (proof: Uint8Array, vk: Uint8Array) => {
+export const verifyProof = async (
+  proof: ProofData,
+  vk: Uint8Array,
+  onStatusUpdate?: (status: string) => void
+): Promise<{ success: boolean; status: string }> => {
   const API_URL = "https://relayer-api.horizenlabs.io/api/v1";
   const API_KEY = import.meta.env.VITE_HORIZEN_API_KEY;
 
@@ -21,140 +17,80 @@ export const verifyProof = async (proof: Uint8Array, vk: Uint8Array) => {
     throw new Error("HORIZEN_API_KEY environment variable is not set");
   }
 
-  const bufvk = vk;
-  const base64Proof = proof.toString("base64");
-  const base64Vk = bufvk.toString("base64");
+  const proofUint8 = new Uint8Array(Object.values(proof.proof));
+
+  let p2 = Buffer.from(
+    concatenatePublicInputsAndProof(proof.publicInputs, proofUint8)
+  ).toString("base64");
+
+  let basedVk = Buffer.from(vk).toString("base64");
 
   const params = {
     proofType: "ultraplonk",
     vkRegistered: false,
     proofOptions: {
-      numberOfPublicInputs: 4,
+      numberOfPublicInputs: WORD_LENGTH,
     },
     proofData: {
-      proof: base64Proof,
-      vk: base64Vk,
+      proof: p2,
+      vk: basedVk,
     },
   };
 
-  const requestResponse = await axios.post(
+  onStatusUpdate?.("Submitting proof for verification...");
+  const verificationResponse = await axios.post(
     `${API_URL}/submit-proof/${API_KEY}`,
     params
   );
-  console.log(requestResponse.data);
 
-  /* const session = await zkVerifySession.start().Volta();
+  onStatusUpdate?.("Proof submitted. Waiting for verification...");
 
+  // Check status a few times with delays
+  for (let i = 0; i < 10; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 3000)); // Wait 3 seconds
 
-  console.log("vkey", vkey);
+    const jobStatusResponse = await axios.get(
+      `${API_URL}/job-status/${API_KEY}/${verificationResponse.data.jobId}`
+    );
 
+    const status = jobStatusResponse.data.status;
+    onStatusUpdate?.(`Verification status: ${status}`);
 
-  let statement, aggregationId: number;
+    if (status === "Finalized") {
+      console.log("Job finalized");
+      return { success: true, status: "Verification complete!" };
+    } else if (status === "Failed") {
+      return { success: false, status: "Verification failed" };
+    }
+  }
 
-  session.subscribe([
-    {
-      event: ZkVerifyEvents.NewAggregationReceipt,
-      callback: async (eventData) => {
-        console.log("New aggregation receipt:", eventData);
-        if (
-          aggregationId ==
-          parseInt(eventData.data.aggregationId.replace(/,/g, ""))
-        ) {
-          let statementpath = await session.getAggregateStatementPath(
-            eventData.blockHash,
-            parseInt(eventData.data.domainId),
-            parseInt(eventData.data.aggregationId.replace(/,/g, "")),
-            statement
-          );
-          console.log("Statement path:", statementpath);
-          const statementproof = {
-            ...statementpath,
-            domainId: parseInt(eventData.data.domainId),
-            aggregationId: parseInt(eventData.data.aggregationId),
-          };
-          fs.writeFileSync("aggregation.json", JSON.stringify(statementproof));
-        }
-      },
-      options: { domainId: 0 },
-    },
-  ]);
-
-  const { events } = await session
-    .verify()
-    .ultraplonk({ numberOfPublicInputs: 4 }) // Make sure to replace the numberOfPublicInputs field as per your circuit
-    .withRegisteredVk()
-    .execute({
-      proofData: {
-        vk: vkey.hash,
-        proof: base64Proof,
-      },
-      domainId: 0,
-    });
-
-  events.on(ZkVerifyEvents.IncludedInBlock, (eventData) => {
-    console.log("Included in block", eventData);
-    statement = eventData.statement;
-    aggregationId = eventData.aggregationId;
-  }); */
+  return { success: false, status: "Verification timeout" };
 };
 
-/* 
-const session = await zkVerifySession
-  .start()
-  .Volta()
-  .withAccount(
-    "word slim pencil rough stove mandate umbrella worry solution feature inhale regret"
+function hexToUint8Array(hex: any) {
+  if (hex.startsWith("0x")) hex = hex.slice(2);
+  if (hex.length % 2 !== 0) hex = "0" + hex;
+
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.substr(i * 2, 2), 16);
+  }
+  return bytes;
+}
+
+function concatenatePublicInputsAndProof(
+  publicInputsHex: any,
+  proofUint8: any
+) {
+  const publicInputBytesArray = publicInputsHex.flatMap((hex: any) =>
+    Array.from(hexToUint8Array(hex))
   );
 
-// FIXME: Can't declare this since events is redeclared later
-//const {events} = await session.registerVerificationKey().ultraplonk({numberOfPublicInputs:2}).execute(base64Vk);
+  const publicInputBytes = new Uint8Array(publicInputBytesArray);
 
-const vkey = fs.readFileSync("./vkey.json"); //Importing the registered vkhash
-let statement, aggregationId;
+  const newProof = new Uint8Array(publicInputBytes.length + proofUint8.length);
+  newProof.set(publicInputBytes, 0);
+  newProof.set(proofUint8, publicInputBytes.length);
 
-session.subscribe([
-  {
-    event: ZkVerifyEvents.NewAggregationReceipt,
-    callback: async (eventData) => {
-      console.log("New aggregation receipt:", eventData);
-      if (
-        aggregationId ==
-        parseInt(eventData.data.aggregationId.replace(/,/g, ""))
-      ) {
-        let statementpath = await session.getAggregateStatementPath(
-          eventData.blockHash,
-          parseInt(eventData.data.domainId),
-          parseInt(eventData.data.aggregationId.replace(/,/g, "")),
-          statement
-        );
-        console.log("Statement path:", statementpath);
-        const statementproof = {
-          ...statementpath,
-          domainId: parseInt(eventData.data.domainId),
-          aggregationId: parseInt(eventData.data.aggregationId),
-        };
-        fs.writeFileSync("aggregation.json", JSON.stringify(statementproof));
-      }
-    },
-    options: { domainId: 0 },
-  },
-]);
-
-const { events } = await session
-  .verify()
-  .ultraplonk({ numberOfPublicInputs: 4 }) // Make sure to replace the numberOfPublicInputs field as per your circuit
-  .withRegisteredVk()
-  .execute({
-    proofData: {
-      vk: JSON.parse(vkey).hash,
-      proof: base64Proof,
-    },
-    domainId: 0,
-  });
-
-events.on(ZkVerifyEvents.IncludedInBlock, (eventData) => {
-  console.log("Included in block", eventData);
-  statement = eventData.statement;
-  aggregationId = eventData.aggregationId;
-});
- */
+  return newProof;
+}

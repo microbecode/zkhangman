@@ -2,41 +2,28 @@ import { useState, useCallback, useEffect } from "react";
 import { Noir } from "@noir-lang/noir_js";
 import { UltraPlonkBackend } from "@aztec/bb.js";
 import circuit from "../circuit.json";
-//import vkey from "../../public/vkey.json";
 import "./Hangman.css";
-import { zkVerifySession, ZkVerifyEvents } from "zkverifyjs";
-import fs from "fs";
 import { verifyProof } from "../verify";
+import { WORDS } from "../words";
 
-// List of words to guess
-const WORDS = ["NOIR"];
+export const WORD_LENGTH = 7;
 
 // Maximum number of incorrect guesses before game over
 const MAX_WRONG_GUESSES = 6;
 
 export function Hangman() {
   // Game state
-  const [word, setWord] = useState(
-    () => WORDS[Math.floor(Math.random() * WORDS.length)]
+  const [word, setWord] = useState(() =>
+    WORDS[Math.floor(Math.random() * WORDS.length)].toUpperCase()
   );
   const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
   const [gameStatus, setGameStatus] = useState<"playing" | "won" | "lost">(
     "playing"
   );
-  const [proof, setProof] = useState<string>("");
-  const [isGeneratingProof, setIsGeneratingProof] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    /*     const doit = async () => {
-      try {
-        console.log("VKey data:", vkey);
-      } catch (error) {
-        console.error("Error accessing vkey:", error);
-      }
-    };
-    doit(); */
-  }, []);
+  const [isGeneratingProof, setIsGeneratingProof] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
 
   // Calculate number of wrong guesses
   const wrongGuesses = guessedLetters.filter(
@@ -48,13 +35,14 @@ export function Hangman() {
     try {
       setIsGeneratingProof(true);
       setError(null);
+      setVerificationStatus("Generating proof...");
 
-      const noir = new Noir(circuit);
+      const noir = new Noir(circuit as any);
       const backend = new UltraPlonkBackend(circuit.bytecode);
 
       // Convert words to byte arrays
-      const targetWordBytes = new Array(4).fill(0);
-      const guessedWordBytes = new Array(4).fill(0);
+      const targetWordBytes = new Array(WORD_LENGTH).fill(0);
+      const guessedWordBytes = new Array(WORD_LENGTH).fill(0);
 
       for (let i = 0; i < targetWord.length; i++) {
         targetWordBytes[i] = targetWord.charCodeAt(i);
@@ -70,25 +58,21 @@ export function Hangman() {
       // Generate proof
       const proofResult = await backend.generateProof(witness);
 
-      // Convert proof to hex string for display
-      const proofHex = Buffer.from(proofResult.proof).toString("hex");
-      setProof(proofHex);
-
       const vk = await backend.getVerificationKey();
 
-      verifyProof(proofResult.proof, vk);
-
-      // Verify the proof
-      /* const isValid = await backend.verifyProof(
-        proofResult.proof,
-        vkey.verification_key
+      const verificationResult = await verifyProof(proofResult, vk, (status) =>
+        setVerificationStatus(status)
       );
-      if (!isValid) {
-        throw new Error("Proof verification failed");
-      } */
+
+      if (verificationResult.success) {
+        setVerificationStatus("✅ Verification ready!");
+      } else {
+        setVerificationStatus(`❌ ${verificationResult.status}`);
+      }
     } catch (err) {
       console.error("Error generating proof:", err);
       setError(err instanceof Error ? err.message : "Failed to generate proof");
+      setVerificationStatus("❌ Error occurred");
     } finally {
       setIsGeneratingProof(false);
     }
@@ -123,10 +107,20 @@ export function Hangman() {
 
   // Reset game
   const resetGame = () => {
+    // Don't allow reset while verification is in progress
+    if (
+      isGeneratingProof ||
+      (verificationStatus &&
+        !verificationStatus.includes("✅") &&
+        !verificationStatus.includes("❌"))
+    ) {
+      return;
+    }
+
     setWord(WORDS[Math.floor(Math.random() * WORDS.length)]);
     setGuessedLetters([]);
     setGameStatus("playing");
-    setProof("");
+    setVerificationStatus("");
     setError(null);
   };
 
@@ -183,18 +177,15 @@ export function Hangman() {
             <p>
               You saved the hangman! The word was: <strong>{word}</strong>
             </p>
-            {isGeneratingProof ? (
-              <p>Generating proof... ⏳</p>
-            ) : error ? (
-              <p className="error">Error generating proof: {error}</p>
-            ) : proof ? (
-              <div className="proof-container">
-                <h3>🎯 Zero Knowledge Proof</h3>
-                <p>You've proven you know the word without revealing it!</p>
-                <div className="proof">{proof}</div>
-              </div>
-            ) : null}
-            <p>Want to try another word?</p>
+            <div className="verification-status">
+              <h3>🔐 Zero Knowledge Verification</h3>
+              {verificationStatus ? (
+                <p className="status-message">{verificationStatus}</p>
+              ) : (
+                <p>Proving you know the word without revealing it...</p>
+              )}
+              {error && <p className="error">Error: {error}</p>}
+            </div>
           </div>
         )}
         {gameStatus === "lost" && (
@@ -207,8 +198,31 @@ export function Hangman() {
           </div>
         )}
         {(gameStatus === "won" || gameStatus === "lost") && (
-          <button onClick={resetGame} className="reset-button">
-            Play Again
+          <button
+            onClick={resetGame}
+            className={`reset-button ${
+              isGeneratingProof ||
+              (verificationStatus &&
+                !verificationStatus.includes("✅") &&
+                !verificationStatus.includes("❌"))
+                ? "disabled"
+                : ""
+            }`}
+            disabled={
+              isGeneratingProof ||
+              Boolean(
+                verificationStatus &&
+                  !verificationStatus.includes("✅") &&
+                  !verificationStatus.includes("❌")
+              )
+            }
+          >
+            {isGeneratingProof ||
+            (verificationStatus &&
+              !verificationStatus.includes("✅") &&
+              !verificationStatus.includes("❌"))
+              ? "⏳ Please wait..."
+              : "Play Again"}
           </button>
         )}
       </div>
