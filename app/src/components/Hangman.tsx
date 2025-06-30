@@ -53,8 +53,8 @@ export function Hangman() {
       const backend = new UltraPlonkBackend(circuit.bytecode);
 
       // Convert words to byte arrays
-      const targetWordBytes = new Array(10).fill(0);
-      const guessedWordBytes = new Array(10).fill(0);
+      const targetWordBytes = new Array(4).fill(0);
+      const guessedWordBytes = new Array(4).fill(0);
 
       for (let i = 0; i < targetWord.length; i++) {
         targetWordBytes[i] = targetWord.charCodeAt(i);
