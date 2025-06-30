@@ -1,6 +1,7 @@
 import { zkVerifySession, ZkVerifyEvents, WalletOptions } from "zkverifyjs";
 import fs from "fs";
-import vkey from "../public/vkey.json";
+import vkey from "./vkey.json";
+import axios from "axios";
 
 //const bufvk = fs.readFileSync("../vkey.json");
 /* const bufproof = fs.readFileSync("../circuit/target/proof");
@@ -12,15 +13,41 @@ const base64Vk = bufvk.toString("base64"); */
   source,
 }; */
 
-export const verifyProof = async (proof: Uint8Array) => {
-  const session = await zkVerifySession.start().Volta();
-  /*     .withAccount(
-      "redacted"
-    ); */
+export const verifyProof = async (proof: Uint8Array, vk: Uint8Array) => {
+  const API_URL = "https://relayer-api.horizenlabs.io/api/v1";
+  const API_KEY = import.meta.env.VITE_HORIZEN_API_KEY;
+
+  if (!API_KEY) {
+    throw new Error("HORIZEN_API_KEY environment variable is not set");
+  }
+
+  const bufvk = vk;
+  const base64Proof = proof.toString("base64");
+  const base64Vk = bufvk.toString("base64");
+
+  const params = {
+    proofType: "ultraplonk",
+    vkRegistered: false,
+    proofOptions: {
+      numberOfPublicInputs: 4,
+    },
+    proofData: {
+      proof: base64Proof,
+      vk: base64Vk,
+    },
+  };
+
+  const requestResponse = await axios.post(
+    `${API_URL}/submit-proof/${API_KEY}`,
+    params
+  );
+  console.log(requestResponse.data);
+
+  /* const session = await zkVerifySession.start().Volta();
+
 
   console.log("vkey", vkey);
 
-  /*   const base64Proof = proof.toString("base64"); */
 
   let statement, aggregationId: number;
 
@@ -68,7 +95,7 @@ export const verifyProof = async (proof: Uint8Array) => {
     console.log("Included in block", eventData);
     statement = eventData.statement;
     aggregationId = eventData.aggregationId;
-  });
+  }); */
 };
 
 /* 

@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { Noir } from "@noir-lang/noir_js";
-import { UltraHonkBackend } from "@aztec/bb.js";
-import circuit from "../../public/circuit.json";
-import vkey from "../../public/vkey.json";
+import { UltraPlonkBackend } from "@aztec/bb.js";
+import circuit from "../circuit.json";
+//import vkey from "../../public/vkey.json";
 import "./Hangman.css";
 import { zkVerifySession, ZkVerifyEvents } from "zkverifyjs";
 import fs from "fs";
@@ -28,14 +28,14 @@ export function Hangman() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const doit = async () => {
+    /*     const doit = async () => {
       try {
         console.log("VKey data:", vkey);
       } catch (error) {
         console.error("Error accessing vkey:", error);
       }
     };
-    doit();
+    doit(); */
   }, []);
 
   // Calculate number of wrong guesses
@@ -50,7 +50,7 @@ export function Hangman() {
       setError(null);
 
       const noir = new Noir(circuit);
-      const backend = new UltraHonkBackend(circuit.bytecode);
+      const backend = new UltraPlonkBackend(circuit.bytecode);
 
       // Convert words to byte arrays
       const targetWordBytes = new Array(10).fill(0);
@@ -74,7 +74,9 @@ export function Hangman() {
       const proofHex = Buffer.from(proofResult.proof).toString("hex");
       setProof(proofHex);
 
-      verifyProof(proofResult.proof);
+      const vk = await backend.getVerificationKey();
+
+      verifyProof(proofResult.proof, vk);
 
       // Verify the proof
       /* const isValid = await backend.verifyProof(
