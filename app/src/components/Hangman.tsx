@@ -11,6 +11,15 @@ export const WORD_LENGTH = 7;
 // Maximum number of incorrect guesses before game over
 const MAX_WRONG_GUESSES = 6;
 
+// Interface for verification queue items
+interface VerificationItem {
+  id: string;
+  word: string;
+  status: "pending" | "generating" | "verifying" | "completed" | "failed";
+  message: string;
+  timestamp: Date;
+}
+
 export function Hangman() {
   // Game state
   const [word, setWord] = useState(() =>
@@ -25,17 +34,68 @@ export function Hangman() {
   const [verificationStatus, setVerificationStatus] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
+  // Background verification queue
+  const [verificationQueue, setVerificationQueue] = useState<
+    VerificationItem[]
+  >([]);
+  const [toasts, setToasts] = useState<
+    Array<{ id: string; message: string; type: "success" | "error" }>
+  >([]);
+
   // Calculate number of wrong guesses
   const wrongGuesses = guessedLetters.filter(
     (letter) => !word.includes(letter)
   ).length;
 
+  // Add toast notification
+  const addToast = (message: string, type: "success" | "error") => {
+    const id = Date.now().toString();
+    setToasts((prev) => [...prev, { id, message, type }]);
+
+    // Auto-remove toast after 5 seconds
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 5000);
+  };
+
+  // Remove toast
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  };
+
   // Generate proof that the word was correctly guessed
   const generateProof = async (targetWord: string) => {
+    const verificationId = Date.now().toString();
+
+    // Add to verification queue
+    const newVerificationItem: VerificationItem = {
+      id: verificationId,
+      word: targetWord,
+      status: "pending",
+      message: "Queued for verification",
+      timestamp: new Date(),
+    };
+
+    setVerificationQueue((prev) => [...prev, newVerificationItem]);
+
+    // Start background verification
+    verifyProofInBackground(verificationId, targetWord);
+  };
+
+  // Background verification function
+  const verifyProofInBackground = async (
+    verificationId: string,
+    targetWord: string
+  ) => {
     try {
-      setIsGeneratingProof(true);
-      setError(null);
-      setVerificationStatus("Generating proof...");
+      // Update status to generating
+      setVerificationQueue((prev) =>
+        prev.map((item) =>
+          item.id === verificationId
+            ? { ...item, status: "generating", message: "Generating proof..." }
+            : item
+        )
+      );
 
       const noir = new Noir(circuit as any);
       const backend = new UltraPlonkBackend(circuit.bytecode);
@@ -57,24 +117,61 @@ export function Hangman() {
 
       // Generate proof
       const proofResult = await backend.generateProof(witness);
-
       const vk = await backend.getVerificationKey();
 
-      const verificationResult = await verifyProof(proofResult, vk, (status) =>
-        setVerificationStatus(status)
+      // Update status to verifying
+      setVerificationQueue((prev) =>
+        prev.map((item) =>
+          item.id === verificationId
+            ? { ...item, status: "verifying", message: "Verifying proof..." }
+            : item
+        )
       );
 
+      const verificationResult = await verifyProof(
+        proofResult,
+        vk,
+        (status) => {
+          setVerificationQueue((prev) =>
+            prev.map((item) =>
+              item.id === verificationId ? { ...item, message: status } : item
+            )
+          );
+        }
+      );
+
+      // Update final status
+      const finalStatus = verificationResult.success ? "completed" : "failed";
+      const finalMessage = verificationResult.success
+        ? "✅ Verification complete!"
+        : `❌ ${verificationResult.status}`;
+
+      setVerificationQueue((prev) =>
+        prev.map((item) =>
+          item.id === verificationId
+            ? { ...item, status: finalStatus, message: finalMessage }
+            : item
+        )
+      );
+
+      // Show toast notification
       if (verificationResult.success) {
-        setVerificationStatus("✅ Verification ready!");
+        addToast(`Verification succeeded for "${targetWord}"! 🎉`, "success");
       } else {
-        setVerificationStatus(`❌ ${verificationResult.status}`);
+        addToast(`Verification failed for "${targetWord}"`, "error");
       }
     } catch (err) {
-      console.error("Error generating proof:", err);
-      setError(err instanceof Error ? err.message : "Failed to generate proof");
-      setVerificationStatus("❌ Error occurred");
-    } finally {
-      setIsGeneratingProof(false);
+      console.error("Error in background verification:", err);
+
+      setVerificationQueue((prev) =>
+        prev.map((item) =>
+          item.id === verificationId
+            ? { ...item, status: "failed", message: "❌ Error occurred" }
+            : item
+        )
+      );
+
+      addToast(`Verification error for "${targetWord}"`, "error");
     }
   };
 
@@ -107,17 +204,7 @@ export function Hangman() {
 
   // Reset game
   const resetGame = () => {
-    // Don't allow reset while verification is in progress
-    if (
-      isGeneratingProof ||
-      (verificationStatus &&
-        !verificationStatus.includes("✅") &&
-        !verificationStatus.includes("❌"))
-    ) {
-      return;
-    }
-
-    setWord(WORDS[Math.floor(Math.random() * WORDS.length)]);
+    setWord(WORDS[Math.floor(Math.random() * WORDS.length)].toUpperCase());
     setGuessedLetters([]);
     setGameStatus("playing");
     setVerificationStatus("");
@@ -179,12 +266,10 @@ export function Hangman() {
             </p>
             <div className="verification-status">
               <h3>🔐 Zero Knowledge Verification</h3>
-              {verificationStatus ? (
-                <p className="status-message">{verificationStatus}</p>
-              ) : (
-                <p>Proving you know the word without revealing it...</p>
-              )}
-              {error && <p className="error">Error: {error}</p>}
+              <p>
+                Proof queued for background verification - you can continue
+                playing!
+              </p>
             </div>
           </div>
         )}
@@ -198,31 +283,8 @@ export function Hangman() {
           </div>
         )}
         {(gameStatus === "won" || gameStatus === "lost") && (
-          <button
-            onClick={resetGame}
-            className={`reset-button ${
-              isGeneratingProof ||
-              (verificationStatus &&
-                !verificationStatus.includes("✅") &&
-                !verificationStatus.includes("❌"))
-                ? "disabled"
-                : ""
-            }`}
-            disabled={
-              isGeneratingProof ||
-              Boolean(
-                verificationStatus &&
-                  !verificationStatus.includes("✅") &&
-                  !verificationStatus.includes("❌")
-              )
-            }
-          >
-            {isGeneratingProof ||
-            (verificationStatus &&
-              !verificationStatus.includes("✅") &&
-              !verificationStatus.includes("❌"))
-              ? "⏳ Please wait..."
-              : "Play Again"}
+          <button onClick={resetGame} className="reset-button">
+            Play Again
           </button>
         )}
       </div>
@@ -241,6 +303,49 @@ export function Hangman() {
           >
             {letter}
           </button>
+        ))}
+      </div>
+
+      {/* Verification Queue */}
+      {verificationQueue.length > 0 && (
+        <div className="verification-queue">
+          <h3>🔍 Verification Queue</h3>
+          <div className="queue-items">
+            {verificationQueue
+              .slice()
+              .reverse()
+              .map((item) => (
+                <div key={item.id} className={`queue-item ${item.status}`}>
+                  <div className="queue-item-header">
+                    <span className="word">{item.word}</span>
+                    <span className="status">{item.status}</span>
+                  </div>
+                  <div className="queue-item-message">{item.message}</div>
+                  <div className="queue-item-time">
+                    {item.timestamp.toLocaleTimeString()}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notifications */}
+      <div className="toast-container">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`toast ${toast.type}`}
+            onClick={() => removeToast(toast.id)}
+          >
+            {toast.message}
+            <button
+              className="toast-close"
+              onClick={() => removeToast(toast.id)}
+            >
+              ×
+            </button>
+          </div>
         ))}
       </div>
     </div>
